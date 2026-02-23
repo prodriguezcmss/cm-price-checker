@@ -44,6 +44,19 @@ export default function HomePage() {
         >
           Open Price Checker
         </Link>
+        <Link
+          href="/analytics/price-checker"
+          style={{
+            justifySelf: "start",
+            borderRadius: "12px",
+            background: "#af2230",
+            color: "#fff",
+            padding: "11px 16px",
+            fontWeight: 600
+          }}
+        >
+          Open Analytics Dashboard
+        </Link>
       </section>
     </main>
   );

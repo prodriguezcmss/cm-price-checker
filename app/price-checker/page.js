@@ -56,6 +56,19 @@ export default function PriceCheckerPage() {
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState(null);
   const [error, setError] = useState("");
+
+  const trackEvent = async (payload) => {
+    try {
+      await fetch("/api/analytics/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } catch {
+      // Skip analytics failures to keep checkout flow smooth.
+    }
+  };
+
   const scanHint = useMemo(() => {
     if (typeof window === "undefined") return "";
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -120,6 +133,7 @@ export default function PriceCheckerPage() {
     lastCodeRef.current = "";
     setError("");
     setScannerStatus("Starting camera...");
+    trackEvent({ eventType: "camera_start" });
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setScannerStatus("Camera scanner unavailable. Use SKU input instead.");
@@ -205,6 +219,12 @@ export default function PriceCheckerPage() {
       setError("Enter an SKU to search");
       return;
     }
+
+    trackEvent({
+      eventType: "manual_lookup_submit",
+      lookupType: "sku",
+      queryValue: manualSku.trim()
+    });
 
     await lookupProduct({ sku: manualSku.trim() });
   };

@@ -6,8 +6,12 @@ Mobile-friendly in-store price checker for `shopcmss.com`, built with Next.js an
 
 - `GET /price-checker` customer-facing page
 - Camera barcode scanning (when browser supports `BarcodeDetector`)
+- Camera scanning fallback with ZXing for unsupported devices
 - SKU manual entry fallback
 - `GET /api/price-checker?barcode=...` and `GET /api/price-checker?sku=...`
+- `POST /api/analytics/track` for custom usage events
+- `GET /api/analytics/price-checker?hours=24` analytics summary endpoint
+- `GET /analytics/price-checker` internal dashboard
 - Branded UI with:
   - Main color `#1f3e5d`
   - Secondary color `#af2230`
@@ -33,6 +37,39 @@ Mobile-friendly in-store price checker for `shopcmss.com`, built with Next.js an
   - `SHOPIFY_API_KEY`
   - `SHOPIFY_API_SECRET`
   - `SHOPIFY_SCOPES` including `read_products`
+
+## Analytics storage (Supabase)
+
+To enable analytics events and dashboard, configure:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Create the table:
+
+```sql
+create table if not exists price_checker_events (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamp with time zone default now(),
+  event_type text not null,
+  lookup_type text,
+  query_value text,
+  success boolean,
+  error_message text,
+  product_id text,
+  product_title text,
+  user_agent text,
+  ip_address text,
+  meta jsonb default '{}'::jsonb
+);
+
+create index if not exists price_checker_events_created_at_idx
+  on price_checker_events (created_at desc);
+```
+
+Analytics dashboard:
+
+- `https://your-domain/analytics/price-checker`
 
 ## Branding assets
 

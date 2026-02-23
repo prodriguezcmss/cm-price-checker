@@ -63,6 +63,18 @@ function mapVariant(variantNode) {
   };
 }
 
+function getRequestMeta(request) {
+  const userAgent = request.headers.get("user-agent") || "";
+  const forwardedFor = request.headers.get("x-forwarded-for") || "";
+  const ip = forwardedFor.split(",")[0]?.trim() || null;
+  return { userAgent, ip };
+}
+
+async function logPriceCheckerEvent(supabase, event) {
+  if (!supabase) return;
+  await supabase.from("price_checker_events").insert(event);
+}
+
 async function resolveShopifyAdminConfig() {
   const shop = process.env.SHOPIFY_SHOP;
   let token = process.env.SHOPIFY_ACCESS_TOKEN;
@@ -84,6 +96,8 @@ async function resolveShopifyAdminConfig() {
 }
 
 export async function GET(request) {
+  const supabase = getSupabaseServerClient();
+  const { userAgent, ip } = getRequestMeta(request);
   const { searchParams } = new URL(request.url);
   const barcode = sanitizeInput(searchParams.get("barcode"));
   const sku = sanitizeInput(searchParams.get("sku"));
@@ -92,6 +106,18 @@ export async function GET(request) {
   const rawCode = barcode || sku;
 
   if (!rawCode) {
+    try {
+      await logPriceCheckerEvent(supabase, {
+        event_type: "lookup",
+        lookup_type: type,
+        query_value: rawCode,
+        success: false,
+        error_message: "Missing query parameter",
+        user_agent: userAgent,
+        ip_address: ip
+      });
+    } catch {}
+
     return Response.json(
       {
         ok: false,
@@ -103,6 +129,18 @@ export async function GET(request) {
 
   const config = await resolveShopifyAdminConfig();
   if (!config) {
+    try {
+      await logPriceCheckerEvent(supabase, {
+        event_type: "lookup",
+        lookup_type: type,
+        query_value: rawCode,
+        success: false,
+        error_message: "Missing Shopify credentials",
+        user_agent: userAgent,
+        ip_address: ip
+      });
+    } catch {}
+
     return Response.json(
       {
         ok: false,
@@ -120,10 +158,30 @@ export async function GET(request) {
   );
 
   if (errors?.length) {
+    const resolvedError =
+      errors?.[0]?.message ||
+      (typeof errors === "string" ? errors : null) ||
+      "Shopify query failed";
+    try {
+      await logPriceCheckerEvent(supabase, {
+        event_type: "lookup",
+        lookup_type: type,
+        query_value: rawCode,
+        success: false,
+        error_message: resolvedError,
+        user_agent: userAgent,
+        ip_address: ip,
+        meta: {
+          shop: config.shop,
+          apiVersion: config.version
+        }
+      });
+    } catch {}
+
     return Response.json(
       {
         ok: false,
-        error: errors[0]?.message || "Shopify query failed",
+        error: resolvedError,
         details: errors,
         debug: {
           shop: config.shop,
@@ -137,6 +195,18 @@ export async function GET(request) {
 
   const variantNode = data?.productVariants?.edges?.[0]?.node;
   if (!variantNode) {
+    try {
+      await logPriceCheckerEvent(supabase, {
+        event_type: "lookup",
+        lookup_type: type,
+        query_value: rawCode,
+        success: false,
+        error_message: "No product found",
+        user_agent: userAgent,
+        ip_address: ip
+      });
+    } catch {}
+
     return Response.json(
       {
         ok: false,
@@ -146,5 +216,20 @@ export async function GET(request) {
     );
   }
 
-  return Response.json({ ok: true, product: mapVariant(variantNode) });
+  const product = mapVariant(variantNode);
+  try {
+    await logPriceCheckerEvent(supabase, {
+      event_type: "lookup",
+      lookup_type: type,
+      query_value: rawCode,
+      success: true,
+      error_message: null,
+      user_agent: userAgent,
+      ip_address: ip,
+      product_id: product.productId,
+      product_title: product.title
+    });
+  } catch {}
+
+  return Response.json({ ok: true, product });
 }
