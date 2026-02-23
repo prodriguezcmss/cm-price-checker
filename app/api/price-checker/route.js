@@ -123,7 +123,13 @@ export async function GET(request) {
     return Response.json(
       {
         ok: false,
-        error: errors[0]?.message || "Shopify query failed"
+        error: errors[0]?.message || "Shopify query failed",
+        details: errors,
+        debug: {
+          shop: config.shop,
+          apiVersion: config.version,
+          queryType: type
+        }
       },
       { status: 502 }
     );
