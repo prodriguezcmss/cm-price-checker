@@ -47,6 +47,7 @@ export default function PriceCheckerPage() {
   const streamRef = useRef(null);
   const detectorRef = useRef(null);
   const intervalRef = useRef(null);
+  const zxingControlsRef = useRef(null);
   const loadingRef = useRef(false);
   const lastCodeRef = useRef("");
 
@@ -57,8 +58,8 @@ export default function PriceCheckerPage() {
   const [error, setError] = useState("");
   const scanHint = useMemo(() => {
     if (typeof window === "undefined") return "";
-    if (!window.BarcodeDetector) {
-      return "Barcode scanning is not supported on this device. Use SKU entry below.";
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return "Camera scanning is not supported on this device. Use SKU entry below.";
     }
     return "Center barcode in frame and keep phone steady.";
   }, []);
@@ -67,6 +68,11 @@ export default function PriceCheckerPage() {
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
+    }
+
+    if (zxingControlsRef.current?.stop) {
+      zxingControlsRef.current.stop();
+      zxingControlsRef.current = null;
     }
 
     if (streamRef.current) {
@@ -115,8 +121,39 @@ export default function PriceCheckerPage() {
     setError("");
     setScannerStatus("Starting camera...");
 
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setScannerStatus("Camera scanner unavailable. Use SKU input instead.");
+      return;
+    }
+
     if (!("BarcodeDetector" in window)) {
-      setScannerStatus("Barcode scanner unavailable. Use SKU input instead.");
+      try {
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        const reader = new BrowserMultiFormatReader();
+
+        if (!videoRef.current) {
+          throw new Error("Camera preview unavailable");
+        }
+
+        setScannerStatus("Camera active. Point at barcode.");
+        zxingControlsRef.current = await reader.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          async (result) => {
+            const code = result?.getText?.()?.trim();
+
+            if (!code || code === lastCodeRef.current || loadingRef.current) {
+              return;
+            }
+
+            lastCodeRef.current = code;
+            await lookupProduct({ barcode: code });
+          }
+        );
+      } catch (cameraError) {
+        setScannerStatus("Could not access camera. Check browser permissions.");
+        setError(cameraError.message || "Unable to start camera");
+      }
       return;
     }
 
