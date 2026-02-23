@@ -13,7 +13,6 @@ const PRODUCT_BY_CODE_QUERY = `
           barcode
           price
           compareAtPrice
-          inventoryQuantity
           product {
             id
             title
@@ -58,7 +57,6 @@ function mapVariant(variantNode) {
     productPrice: currentPrice,
     salePrice: hasSalePrice ? currentPrice : null,
     compareAtPrice: hasSalePrice ? compareAtPrice : null,
-    inventoryQuantity: variantNode.inventoryQuantity,
     onlineStoreUrl: variantNode.product?.onlineStoreUrl || null,
     currency: "USD",
     lastUpdatedAt: new Date().toISOString()
