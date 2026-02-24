@@ -1,4 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +9,31 @@ function sanitize(value) {
 
 function getRequestMeta(request) {
   const userAgent = request.headers.get("user-agent") || "";
-  const forwardedFor = request.headers.get("x-forwarded-for") || "";
-  const ip = forwardedFor.split(",")[0]?.trim() || null;
+  const ip = getClientIp(request);
   return { userAgent, ip };
 }
 
 export async function POST(request) {
+  const ip = getClientIp(request);
+  const rateLimit = checkRateLimit({
+    namespace: "price-checker-analytics-track",
+    key: ip,
+    maxRequests: 60,
+    windowMs: 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return Response.json(
+      { ok: false, error: "Rate limited" },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rateLimit.retryAfterSeconds)
+        }
+      }
+    );
+  }
+
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     return Response.json(

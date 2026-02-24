@@ -1,5 +1,6 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { getShopifyConfig, shopifyGraphQL } from "@/lib/shopify";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -119,8 +120,7 @@ async function fetchSuggestions({ type, rawCode, config }) {
 
 function getRequestMeta(request) {
   const userAgent = request.headers.get("user-agent") || "";
-  const forwardedFor = request.headers.get("x-forwarded-for") || "";
-  const ip = forwardedFor.split(",")[0]?.trim() || null;
+  const ip = getClientIp(request);
   return { userAgent, ip };
 }
 
@@ -152,6 +152,28 @@ async function resolveShopifyAdminConfig() {
 export async function GET(request) {
   const supabase = getSupabaseServerClient();
   const { userAgent, ip } = getRequestMeta(request);
+  const rateLimit = checkRateLimit({
+    namespace: "price-checker-lookup",
+    key: ip,
+    maxRequests: 30,
+    windowMs: 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return Response.json(
+      {
+        ok: false,
+        error: "Too many requests. Please wait a moment and try again."
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rateLimit.retryAfterSeconds)
+        }
+      }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const barcode = sanitizeInput(searchParams.get("barcode"));
   const sku = sanitizeInput(searchParams.get("sku"));

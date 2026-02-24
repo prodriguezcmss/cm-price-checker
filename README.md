@@ -71,6 +71,15 @@ Analytics dashboard:
 
 - `https://your-domain/analytics/price-checker`
 
+## Rate limiting
+
+The app includes lightweight in-memory per-IP protection:
+
+- `GET /api/price-checker`: `30` requests per `60` seconds
+- `POST /api/analytics/track`: `60` requests per `60` seconds
+
+When exceeded, endpoints return `429` with a `Retry-After` header.
+
 ## Branding assets
 
 Place your logo at:
