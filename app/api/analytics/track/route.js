@@ -57,7 +57,7 @@ export async function POST(request) {
   const success = typeof body?.success === "boolean" ? body.success : null;
   const errorMessage = sanitize(body?.errorMessage) || null;
   const meta = body?.meta && typeof body.meta === "object" ? body.meta : {};
-  const { userAgent, ip } = getRequestMeta(request);
+  const { userAgent, ip: requestIp } = getRequestMeta(request);
 
   const { error } = await supabase.from("price_checker_events").insert({
     event_type: eventType,
@@ -66,7 +66,7 @@ export async function POST(request) {
     success,
     error_message: errorMessage,
     user_agent: userAgent,
-    ip_address: ip,
+    ip_address: requestIp,
     meta
   });
 
