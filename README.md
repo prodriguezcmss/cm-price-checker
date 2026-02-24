@@ -93,3 +93,45 @@ If the file is missing, the page falls back to a text wordmark.
 Use this URL in your in-store QR code:
 
 - `https://shopcmss.com/price-checker`
+
+## POS handoff (phase 1 pilot-ready)
+
+This release includes cart handoff foundations plus customer list UI behind a feature flag.
+Public behavior is unchanged while disabled.
+
+Feature flag controls:
+
+- `POS_HANDOFF_ENABLED=false` (default, disabled; enable only for Riverside pilot)
+- `POS_HANDOFF_ALLOWED_STORE_ID=riverside`
+- `POS_HANDOFF_EXPIRY_MINUTES=60`
+
+API endpoints (only active when enabled):
+
+- `GET /api/pos-handoff/config`
+- `POST /api/pos-handoff/create`
+- `GET /api/pos-handoff/retrieve?code=ABC123&storeId=riverside`
+- `POST /api/pos-handoff/claim`
+
+Create the handoff table in Supabase:
+
+```sql
+create table if not exists pos_handoffs (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamp with time zone default now(),
+  handoff_code text not null unique,
+  store_id text not null,
+  status text not null check (status in ('open', 'claimed', 'expired')),
+  expires_at timestamp with time zone not null,
+  claimed_at timestamp with time zone,
+  claimed_by_staff_user_id text,
+  customer_session_id text,
+  source text,
+  items jsonb not null default '[]'::jsonb
+);
+
+create index if not exists pos_handoffs_store_status_idx
+  on pos_handoffs (store_id, status);
+
+create index if not exists pos_handoffs_expires_at_idx
+  on pos_handoffs (expires_at);
+```

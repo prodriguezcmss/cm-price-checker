@@ -42,6 +42,7 @@
 .scannerCard,
 .skuCard,
 .suggestionCard,
+.handoffCard,
 .productCard {
   border-radius: 20px;
   border: 1px solid rgba(31, 62, 93, 0.15);
@@ -53,6 +54,7 @@
 .scannerCard h1,
 .skuCard h2,
 .suggestionCard h2,
+.handoffCard h2,
 .productInfo h2 {
   font-family: var(--font-display), serif;
   color: #1f3e5d;
@@ -61,6 +63,7 @@
 .scannerCard p,
 .skuCard p,
 .suggestionCard p,
+.handoffCard p,
 .status,
 .description,
 .meta {
@@ -164,6 +167,66 @@
   color: #4d6276;
   font-size: 12px;
   margin-top: 3px;
+}
+
+.handoffList {
+  list-style: none;
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.handoffItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f4f7fb;
+  border: 1px solid rgba(31, 62, 93, 0.14);
+}
+
+.handoffItem strong {
+  display: block;
+  color: #1f3e5d;
+  font-size: 14px;
+}
+
+.handoffItem span {
+  display: block;
+  color: #4d6276;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.qty {
+  min-width: 20px;
+  text-align: center;
+  color: #1f3e5d;
+  font-weight: 700;
+  align-self: center;
+}
+
+.handoffCodeCard {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(31, 62, 93, 0.16);
+  background: #eef3f9;
+}
+
+.handoffCodeCard span {
+  color: #445a6f;
+  font-size: 13px;
+}
+
+.handoffCodeCard strong {
+  font-size: 32px;
+  letter-spacing: 2px;
+  color: #1f3e5d;
 }
 
 .productImage {

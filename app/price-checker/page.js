@@ -60,6 +60,14 @@ export default function PriceCheckerPage() {
   const [product, setProduct] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [error, setError] = useState("");
+  const [listItems, setListItems] = useState([]);
+  const [handoffConfig, setHandoffConfig] = useState({
+    enabled: false,
+    storeId: "riverside",
+    expiryMinutes: 60
+  });
+  const [handoffLoading, setHandoffLoading] = useState(false);
+  const [handoffResult, setHandoffResult] = useState(null);
 
   const trackEvent = async (payload) => {
     try {
@@ -70,6 +78,94 @@ export default function PriceCheckerPage() {
       });
     } catch {
       // Skip analytics failures to keep checkout flow smooth.
+    }
+  };
+
+  const addCurrentProductToList = () => {
+    if (!product) return;
+
+    setListItems((current) => {
+      const key = product.variantId || product.sku || product.barcode;
+      const existingIndex = current.findIndex((item) => item.key === key);
+      if (existingIndex >= 0) {
+        return current.map((item, index) =>
+          index === existingIndex
+            ? { ...item, quantity: Math.min(50, item.quantity + 1) }
+            : item
+        );
+      }
+
+      return [
+        ...current,
+        {
+          key,
+          variantId: product.variantId,
+          sku: product.sku,
+          barcode: product.barcode,
+          title: product.title,
+          quantity: 1
+        }
+      ];
+    });
+
+    setHandoffResult(null);
+    setScannerStatus("Added to list. Continue scanning.");
+  };
+
+  const updateListQuantity = (key, delta) => {
+    setListItems((current) =>
+      current
+        .map((item) =>
+          item.key === key
+            ? { ...item, quantity: Math.min(50, Math.max(1, item.quantity + delta)) }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+    setHandoffResult(null);
+  };
+
+  const removeListItem = (key) => {
+    setListItems((current) => current.filter((item) => item.key !== key));
+    setHandoffResult(null);
+  };
+
+  const createHandoff = async () => {
+    if (!handoffConfig.enabled || !listItems.length) return;
+
+    setHandoffLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/pos-handoff/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeId: handoffConfig.storeId,
+          items: listItems.map((item) => ({
+            variantId: item.variantId,
+            sku: item.sku,
+            barcode: item.barcode,
+            title: item.title,
+            quantity: item.quantity
+          }))
+        })
+      });
+
+      const json = await response.json();
+      if (!response.ok || !json.ok) {
+        throw new Error(json.error || "Failed to create register handoff");
+      }
+
+      setHandoffResult({
+        code: json.handoffCode,
+        expiresAt: json.expiresAt
+      });
+    } catch (requestError) {
+      setHandoffResult(null);
+      setError(requestError.message || "Failed to send to register");
+    } finally {
+      setHandoffLoading(false);
     }
   };
 
@@ -318,6 +414,31 @@ export default function PriceCheckerPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadHandoffConfig = async () => {
+      try {
+        const response = await fetch("/api/pos-handoff/config");
+        const json = await response.json();
+        if (!response.ok || !json.ok || !active) return;
+
+        setHandoffConfig({
+          enabled: Boolean(json.enabled),
+          storeId: String(json.storeId || "riverside"),
+          expiryMinutes: Number(json.expiryMinutes || 60)
+        });
+      } catch {
+        // Keep defaults if unavailable.
+      }
+    };
+
+    loadHandoffConfig();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const onSkuSubmit = async (event) => {
     event.preventDefault();
     if (!manualSku.trim()) {
@@ -438,6 +559,15 @@ export default function PriceCheckerPage() {
               </div>
 
               <div className={styles.row}>
+                {handoffConfig.enabled ? (
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={addCurrentProductToList}
+                  >
+                    Add to List
+                  </button>
+                ) : null}
                 <button type="button" className={styles.primaryButton} onClick={scanNextProduct}>
                   Scan Next Product
                 </button>
@@ -446,6 +576,71 @@ export default function PriceCheckerPage() {
                 </button>
               </div>
             </div>
+          </section>
+        ) : null}
+
+        {handoffConfig.enabled ? (
+          <section className={styles.handoffCard}>
+            <h2>Customer List for Register</h2>
+            <p>Store: {handoffConfig.storeId}</p>
+            {!listItems.length ? <p>No items added yet.</p> : null}
+            {listItems.length ? (
+              <ul className={styles.handoffList}>
+                {listItems.map((item) => (
+                  <li key={item.key} className={styles.handoffItem}>
+                    <div>
+                      <strong>{item.title || "Unknown product"}</strong>
+                      <span>SKU: {item.sku || "n/a"}</span>
+                    </div>
+                    <div className={styles.row}>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => updateListQuantity(item.key, -1)}
+                      >
+                        -
+                      </button>
+                      <span className={styles.qty}>{item.quantity}</span>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => updateListQuantity(item.key, 1)}
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => removeListItem(item.key)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            <div className={styles.row}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={createHandoff}
+                disabled={!listItems.length || handoffLoading}
+              >
+                {handoffLoading ? "Sending..." : "Send to Register"}
+              </button>
+            </div>
+
+            {handoffResult ? (
+              <div className={styles.handoffCodeCard}>
+                <span>Show this code to cashier:</span>
+                <strong>{handoffResult.code}</strong>
+                <span>
+                  Expires: {new Date(handoffResult.expiresAt).toLocaleTimeString("en-US")}
+                </span>
+              </div>
+            ) : null}
           </section>
         ) : null}
       </section>
