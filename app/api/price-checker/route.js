@@ -29,6 +29,29 @@ const PRODUCT_BY_CODE_QUERY = `
   }
 `;
 
+const SUGGEST_VARIANTS_QUERY = `
+  query SuggestedVariants($search: String!) {
+    productVariants(first: 5, query: $search) {
+      edges {
+        node {
+          id
+          sku
+          barcode
+          product {
+            id
+            title
+            onlineStoreUrl
+            featuredImage {
+              url
+              altText
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 function sanitizeInput(value) {
   return String(value || "").trim();
 }
@@ -61,6 +84,37 @@ function mapVariant(variantNode) {
     currency: "USD",
     lastUpdatedAt: new Date().toISOString()
   };
+}
+
+function mapSuggestion(variantNode) {
+  return {
+    productId: variantNode.product?.id || null,
+    variantId: variantNode.id || null,
+    title: variantNode.product?.title || "Unknown Product",
+    sku: variantNode.sku || "",
+    barcode: variantNode.barcode || "",
+    imageUrl: variantNode.product?.featuredImage?.url || null,
+    imageAlt: variantNode.product?.featuredImage?.altText || null,
+    onlineStoreUrl: variantNode.product?.onlineStoreUrl || null
+  };
+}
+
+async function fetchSuggestions({ type, rawCode, config }) {
+  const cleaned = rawCode.replace(/"/g, "").trim();
+  if (!cleaned || type !== "sku") return [];
+
+  const search = cleaned.length >= 3 ? `sku:${cleaned}*` : `sku:${cleaned}`;
+  const { data, errors } = await shopifyGraphQL(
+    SUGGEST_VARIANTS_QUERY,
+    { search },
+    config
+  );
+
+  if (errors?.length) return [];
+  const edges = data?.productVariants?.edges || [];
+  return edges
+    .map((edge) => mapSuggestion(edge?.node || {}))
+    .filter((item) => item.sku || item.barcode || item.title);
 }
 
 function getRequestMeta(request) {
@@ -195,6 +249,7 @@ export async function GET(request) {
 
   const variantNode = data?.productVariants?.edges?.[0]?.node;
   if (!variantNode) {
+    const suggestions = await fetchSuggestions({ type, rawCode, config });
     try {
       await logPriceCheckerEvent(supabase, {
         event_type: "lookup",
@@ -203,14 +258,18 @@ export async function GET(request) {
         success: false,
         error_message: "No product found",
         user_agent: userAgent,
-        ip_address: ip
+        ip_address: ip,
+        meta: {
+          suggestionsCount: suggestions.length
+        }
       });
     } catch {}
 
     return Response.json(
       {
         ok: false,
-        error: "No product found"
+        error: "No product found",
+        suggestions
       },
       { status: 404 }
     );

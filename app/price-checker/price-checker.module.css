@@ -41,6 +41,7 @@
 
 .scannerCard,
 .skuCard,
+.suggestionCard,
 .productCard {
   border-radius: 20px;
   border: 1px solid rgba(31, 62, 93, 0.15);
@@ -51,6 +52,7 @@
 
 .scannerCard h1,
 .skuCard h2,
+.suggestionCard h2,
 .productInfo h2 {
   font-family: var(--font-display), serif;
   color: #1f3e5d;
@@ -58,6 +60,7 @@
 
 .scannerCard p,
 .skuCard p,
+.suggestionCard p,
 .status,
 .description,
 .meta {
@@ -130,6 +133,37 @@
 .productCard {
   display: grid;
   gap: 14px;
+}
+
+.suggestionList {
+  list-style: none;
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.suggestionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f4f7fb;
+  border: 1px solid rgba(31, 62, 93, 0.14);
+}
+
+.suggestionItem strong {
+  display: block;
+  color: #1f3e5d;
+  font-size: 14px;
+}
+
+.suggestionItem span {
+  display: block;
+  color: #4d6276;
+  font-size: 12px;
+  margin-top: 3px;
 }
 
 .productImage {

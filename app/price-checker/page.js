@@ -49,6 +49,8 @@ export default function PriceCheckerPage() {
   const detectorRef = useRef(null);
   const intervalRef = useRef(null);
   const zxingControlsRef = useRef(null);
+  const autoResumeTimerRef = useRef(null);
+  const audioContextRef = useRef(null);
   const loadingRef = useRef(false);
   const lastCodeRef = useRef("");
 
@@ -56,6 +58,7 @@ export default function PriceCheckerPage() {
   const [scannerStatus, setScannerStatus] = useState("Tap Start Camera to scan a barcode");
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
   const [error, setError] = useState("");
 
   const trackEvent = async (payload) => {
@@ -79,6 +82,11 @@ export default function PriceCheckerPage() {
   }, []);
 
   const stopCamera = () => {
+    if (autoResumeTimerRef.current) {
+      window.clearTimeout(autoResumeTimerRef.current);
+      autoResumeTimerRef.current = null;
+    }
+
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -99,6 +107,59 @@ export default function PriceCheckerPage() {
     }
   };
 
+  const isCameraRunning = () => {
+    return Boolean(intervalRef.current || zxingControlsRef.current || streamRef.current);
+  };
+
+  const playSuccessFeedback = () => {
+    if (typeof window !== "undefined" && typeof window.navigator?.vibrate === "function") {
+      window.navigator.vibrate(120);
+    }
+
+    if (typeof window === "undefined") return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioCtx();
+      }
+
+      const context = audioContextRef.current;
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(940, context.currentTime);
+      gainNode.gain.setValueAtTime(0.0001, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.15);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.16);
+    } catch {
+      // No-op if audio feedback is unavailable.
+    }
+  };
+
+  const scheduleAutoResume = () => {
+    if (!isCameraRunning()) return;
+
+    if (autoResumeTimerRef.current) {
+      window.clearTimeout(autoResumeTimerRef.current);
+    }
+
+    autoResumeTimerRef.current = window.setTimeout(() => {
+      setProduct(null);
+      setSuggestions([]);
+      setError("");
+      setScannerStatus("Ready to scan next item.");
+      autoResumeTimerRef.current = null;
+    }, 2200);
+  };
+
   const lookupProduct = async ({ barcode, sku }) => {
     const params = new URLSearchParams();
     if (barcode) params.set("barcode", barcode);
@@ -107,22 +168,28 @@ export default function PriceCheckerPage() {
     setLoading(true);
     loadingRef.current = true;
     setError("");
+    setSuggestions([]);
 
     try {
       const response = await fetch(`/api/price-checker?${params.toString()}`);
       const json = await response.json();
 
       if (!response.ok || !json.ok) {
-        throw new Error(json.error || "Product lookup failed");
+        const requestError = new Error(json.error || "Product lookup failed");
+        requestError.suggestions = Array.isArray(json.suggestions) ? json.suggestions : [];
+        throw requestError;
       }
 
       setProduct(json.product);
       if (barcode) {
-        setScannerStatus(`Barcode detected: ${barcode}`);
+        playSuccessFeedback();
+        setScannerStatus(`Barcode detected: ${barcode}. Auto-resuming scan...`);
+        scheduleAutoResume();
       }
     } catch (requestError) {
       setProduct(null);
       setError(requestError.message || "Unable to find product");
+      setSuggestions(Array.isArray(requestError.suggestions) ? requestError.suggestions : []);
     } finally {
       setLoading(false);
       loadingRef.current = false;
@@ -219,10 +286,14 @@ export default function PriceCheckerPage() {
   };
 
   const scanNextProduct = () => {
+    if (autoResumeTimerRef.current) {
+      window.clearTimeout(autoResumeTimerRef.current);
+      autoResumeTimerRef.current = null;
+    }
     setProduct(null);
+    setSuggestions([]);
     setError("");
     setManualSku("");
-    lastCodeRef.current = "";
     setScannerStatus("Ready to scan next item.");
     scrollToScanner();
   };
@@ -230,6 +301,7 @@ export default function PriceCheckerPage() {
   const startOver = () => {
     stopCamera();
     setProduct(null);
+    setSuggestions([]);
     setError("");
     setManualSku("");
     lastCodeRef.current = "";
@@ -238,7 +310,12 @@ export default function PriceCheckerPage() {
   };
 
   useEffect(() => {
-    return () => stopCamera();
+    return () => {
+      stopCamera();
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+      }
+    };
   }, []);
 
   const onSkuSubmit = async (event) => {
@@ -302,6 +379,33 @@ export default function PriceCheckerPage() {
         </section>
 
         {error ? <p className={styles.error}>{error}</p> : null}
+        {suggestions.length ? (
+          <section className={styles.suggestionCard}>
+            <h2>Possible Matches</h2>
+            <p>We could not find an exact match. Try one of these SKUs:</p>
+            <ul className={styles.suggestionList}>
+              {suggestions.map((item) => (
+                <li key={item.variantId || item.sku || item.title} className={styles.suggestionItem}>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span>SKU: {item.sku || "n/a"}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => {
+                      if (!item.sku) return;
+                      setManualSku(item.sku);
+                      lookupProduct({ sku: item.sku });
+                    }}
+                  >
+                    Use SKU
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {product ? (
           <section className={styles.productCard}>
