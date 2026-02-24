@@ -111,6 +111,7 @@ API endpoints (only active when enabled):
 - `POST /api/pos-handoff/create`
 - `GET /api/pos-handoff/retrieve?code=ABC123&storeId=riverside`
 - `POST /api/pos-handoff/claim`
+- `POST /api/pos-handoff/claim-pos` (POS integration friendly: staffId + pin + code)
 
 Staff portal (phase 2):
 
