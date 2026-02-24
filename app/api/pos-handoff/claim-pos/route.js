@@ -6,6 +6,13 @@ import { validateStaffPinLogin } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+  "Access-Control-Max-Age": "86400"
+};
+
 function sanitizeCode(value) {
   return String(value || "")
     .toUpperCase()
@@ -13,9 +20,26 @@ function sanitizeCode(value) {
     .trim();
 }
 
+function jsonWithCors(body, init = {}) {
+  return Response.json(body, {
+    ...init,
+    headers: {
+      ...CORS_HEADERS,
+      ...(init.headers || {})
+    }
+  });
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: CORS_HEADERS
+  });
+}
+
 export async function POST(request) {
   if (!isPosHandoffEnabled()) {
-    return Response.json({ ok: false, error: "Not found" }, { status: 404 });
+    return jsonWithCors({ ok: false, error: "Not found" }, { status: 404 });
   }
 
   const ip = getClientIp(request);
@@ -27,7 +51,7 @@ export async function POST(request) {
   });
 
   if (!rateLimit.allowed) {
-    return Response.json(
+    return jsonWithCors(
       { ok: false, error: "Too many requests. Please wait and try again." },
       {
         status: 429,
@@ -38,7 +62,7 @@ export async function POST(request) {
 
   const supabase = getSupabaseServerClient();
   if (!supabase) {
-    return Response.json(
+    return jsonWithCors(
       { ok: false, error: "Supabase is not configured" },
       { status: 400 }
     );
@@ -51,7 +75,7 @@ export async function POST(request) {
   const pin = String(body?.pin || "");
 
   if (!handoffCode || !storeId || !staffId || !pin) {
-    return Response.json(
+    return jsonWithCors(
       { ok: false, error: "Missing code, storeId, staffId, or pin" },
       { status: 400 }
     );
@@ -59,12 +83,12 @@ export async function POST(request) {
 
   const auth = validateStaffPinLogin({ staffId, pin });
   if (!auth.ok) {
-    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return jsonWithCors({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const allowedStoreId = getAllowedStoreId();
   if (storeId !== allowedStoreId) {
-    return Response.json(
+    return jsonWithCors(
       { ok: false, error: "Store is not allowed for handoff" },
       { status: 403 }
     );
@@ -78,14 +102,14 @@ export async function POST(request) {
     .single();
 
   if (error || !data) {
-    return Response.json(
+    return jsonWithCors(
       { ok: false, error: "Handoff not found" },
       { status: 404 }
     );
   }
 
   if (data.status !== "open") {
-    return Response.json(
+    return jsonWithCors(
       { ok: false, error: `Handoff is ${data.status}` },
       { status: 409 }
     );
@@ -98,7 +122,7 @@ export async function POST(request) {
       .eq("id", data.id)
       .eq("status", "open");
 
-    return Response.json(
+    return jsonWithCors(
       { ok: false, error: "Handoff has expired" },
       { status: 410 }
     );
@@ -116,13 +140,13 @@ export async function POST(request) {
     .eq("status", "open");
 
   if (updateError) {
-    return Response.json(
+    return jsonWithCors(
       { ok: false, error: "Failed to claim handoff" },
       { status: 500 }
     );
   }
 
-  return Response.json({
+  return jsonWithCors({
     ok: true,
     handoff: {
       id: data.id,
