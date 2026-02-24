@@ -130,19 +130,29 @@ async function logPriceCheckerEvent(supabase, event) {
 }
 
 async function resolveShopifyAdminConfig() {
-  const shop = process.env.SHOPIFY_SHOP;
-  let token = process.env.SHOPIFY_ACCESS_TOKEN;
+  let shop = sanitizeInput(process.env.SHOPIFY_SHOP).toLowerCase() || null;
+  let token = sanitizeInput(process.env.SHOPIFY_ACCESS_TOKEN) || null;
 
-  if (!token && shop) {
+  if (!token || !shop) {
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      const { data } = await supabase
+      let query = supabase
         .from("shop_tokens")
-        .select("access_token")
-        .eq("shop", shop)
-        .single();
+        .select("shop,access_token,installed_at")
+        .order("installed_at", { ascending: false })
+        .limit(1);
 
-      token = data?.access_token || null;
+      if (shop) {
+        query = query.eq("shop", shop);
+      }
+
+      const { data } = await query;
+      const row = Array.isArray(data) ? data[0] : null;
+
+      if (row) {
+        if (!shop) shop = sanitizeInput(row.shop).toLowerCase() || null;
+        if (!token) token = sanitizeInput(row.access_token) || null;
+      }
     }
   }
 

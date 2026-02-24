@@ -31,20 +31,30 @@ function normalizeCompanies(edges = []) {
 }
 
 export async function POST() {
-  const shop = process.env.SHOPIFY_SHOP;
+  let shop = String(process.env.SHOPIFY_SHOP || "").trim().toLowerCase();
   const supabase = getSupabaseServerClient();
-  let token = process.env.SHOPIFY_ACCESS_TOKEN;
+  let token = String(process.env.SHOPIFY_ACCESS_TOKEN || "").trim();
 
-  if (!token && supabase && shop) {
-    const { data } = await supabase
+  if ((!token || !shop) && supabase) {
+    let query = supabase
       .from("shop_tokens")
-      .select("access_token")
-      .eq("shop", shop)
-      .single();
-    token = data?.access_token || null;
+      .select("shop,access_token,installed_at")
+      .order("installed_at", { ascending: false })
+      .limit(1);
+
+    if (shop) {
+      query = query.eq("shop", shop);
+    }
+
+    const { data } = await query;
+    const row = Array.isArray(data) ? data[0] : null;
+    if (row) {
+      if (!shop) shop = String(row.shop || "").trim().toLowerCase();
+      if (!token) token = String(row.access_token || "").trim();
+    }
   }
 
-  const config = getShopifyConfig({ shop, token });
+  const config = getShopifyConfig({ shop: shop || null, token: token || null });
   if (!config) {
     return Response.json(
       { ok: false, error: "Missing Shopify credentials" },
