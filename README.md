@@ -112,6 +112,19 @@ API endpoints (only active when enabled):
 - `GET /api/pos-handoff/retrieve?code=ABC123&storeId=riverside`
 - `POST /api/pos-handoff/claim`
 
+Staff portal (phase 2):
+
+- `/staff/pos-handoff`
+- `POST /api/staff/auth/login`
+- `POST /api/staff/auth/logout`
+- `GET /api/staff/auth/session`
+
+Staff auth env vars:
+
+- `STAFF_AUTH_SECRET` (long random string)
+- `STAFF_LOGIN_EMAIL`
+- `STAFF_LOGIN_PASSWORD`
+
 Create the handoff table in Supabase:
 
 ```sql

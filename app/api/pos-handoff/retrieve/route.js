@@ -2,6 +2,7 @@ import { getSupabaseServerClient } from "@/lib/supabase";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { isPosHandoffEnabled } from "@/lib/feature-flags";
 import { getAllowedStoreId, normalizeStoreId } from "@/lib/pos-handoff";
+import { getStaffSessionFromRequest } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,14 @@ function sanitizeCode(value) {
 export async function GET(request) {
   if (!isPosHandoffEnabled()) {
     return Response.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
+
+  const session = getStaffSessionFromRequest(request);
+  if (!session) {
+    return Response.json(
+      { ok: false, error: "Unauthorized" },
+      { status: 401 }
+    );
   }
 
   const ip = getClientIp(request);
