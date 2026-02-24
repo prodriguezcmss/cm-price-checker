@@ -96,7 +96,7 @@ export async function POST(request) {
 
   const { data, error } = await supabase
     .from("pos_handoffs")
-    .select("id,handoff_code,store_id,status,expires_at,items")
+    .select("id,handoff_code,store_id,status,expires_at,items,claimed_at,claimed_by_staff_user_id")
     .eq("handoff_code", handoffCode)
     .eq("store_id", storeId)
     .single();
@@ -105,6 +105,30 @@ export async function POST(request) {
     return jsonWithCors(
       { ok: false, error: "Handoff not found" },
       { status: 404 }
+    );
+  }
+
+  if (data.status === "claimed") {
+    // Idempotent retry for the same staff member in POS in case cart add failed client-side.
+    if (String(data.claimed_by_staff_user_id || "") === auth.staffId) {
+      return jsonWithCors({
+        ok: true,
+        handoff: {
+          id: data.id,
+          code: data.handoff_code,
+          storeId: data.store_id,
+          status: "claimed",
+          claimedAt: data.claimed_at || null,
+          items: Array.isArray(data.items) ? data.items : [],
+          cartLines: buildPosCartLines(data.items)
+        },
+        retry: true
+      });
+    }
+
+    return jsonWithCors(
+      { ok: false, error: "Handoff is claimed" },
+      { status: 409 }
     );
   }
 
