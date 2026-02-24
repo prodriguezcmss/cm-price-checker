@@ -43,6 +43,7 @@ function BrandLogo() {
 }
 
 export default function PriceCheckerPage() {
+  const scannerCardRef = useRef(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const detectorRef = useRef(null);
@@ -209,6 +210,33 @@ export default function PriceCheckerPage() {
     }
   };
 
+  const scrollToScanner = () => {
+    if (!scannerCardRef.current) return;
+    scannerCardRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  };
+
+  const scanNextProduct = () => {
+    setProduct(null);
+    setError("");
+    setManualSku("");
+    lastCodeRef.current = "";
+    setScannerStatus("Ready to scan next item.");
+    scrollToScanner();
+  };
+
+  const startOver = () => {
+    stopCamera();
+    setProduct(null);
+    setError("");
+    setManualSku("");
+    lastCodeRef.current = "";
+    setScannerStatus("Tap Start Camera to scan a barcode");
+    scrollToScanner();
+  };
+
   useEffect(() => {
     return () => stopCamera();
   }, []);
@@ -239,7 +267,7 @@ export default function PriceCheckerPage() {
           <p className={styles.subtitle}>In-Store Price Checker</p>
         </header>
 
-        <section className={styles.scannerCard}>
+        <section className={styles.scannerCard} ref={scannerCardRef}>
           <h1>Scan Product Barcode</h1>
           <p>{scanHint}</p>
 
@@ -303,6 +331,15 @@ export default function PriceCheckerPage() {
               <div className={styles.meta}>
                 <span>SKU: {product.sku || "n/a"}</span>
                 <span>Barcode: {product.barcode || "n/a"}</span>
+              </div>
+
+              <div className={styles.row}>
+                <button type="button" className={styles.primaryButton} onClick={scanNextProduct}>
+                  Scan Next Product
+                </button>
+                <button type="button" className={styles.secondaryButton} onClick={startOver}>
+                  Back to Main Screen
+                </button>
               </div>
             </div>
           </section>
