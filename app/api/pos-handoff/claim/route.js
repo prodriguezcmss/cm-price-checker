@@ -55,7 +55,7 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const handoffCode = sanitizeCode(body?.code);
   const storeId = normalizeStoreId(body?.storeId);
-  const staffUserId = session.email;
+  const staffUserId = session.staffId;
 
   if (!handoffCode || !storeId) {
     return Response.json(

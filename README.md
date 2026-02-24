@@ -122,8 +122,7 @@ Staff portal (phase 2):
 Staff auth env vars:
 
 - `STAFF_AUTH_SECRET` (long random string)
-- `STAFF_LOGIN_EMAIL`
-- `STAFF_LOGIN_PASSWORD`
+- `STAFF_LOGIN_PIN`
 
 Create the handoff table in Supabase:
 

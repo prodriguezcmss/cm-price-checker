@@ -15,9 +15,9 @@ function parseApiError(json, fallback) {
 }
 
 export default function StaffPosHandoffPage() {
-  const [session, setSession] = useState({ loading: true, authenticated: false, email: "" });
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
+  const [session, setSession] = useState({ loading: true, authenticated: false, staffId: "" });
+  const [loginStaffId, setLoginStaffId] = useState("");
+  const [loginPin, setLoginPin] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -34,18 +34,18 @@ export default function StaffPosHandoffPage() {
       const response = await fetch("/api/staff/auth/session");
       const json = await response.json();
       if (!response.ok) {
-        setSession({ loading: false, authenticated: false, email: "" });
+        setSession({ loading: false, authenticated: false, staffId: "" });
         return;
       }
 
       setSession({
         loading: false,
         authenticated: Boolean(json.authenticated),
-        email: String(json.email || "")
+        staffId: String(json.staffId || "")
       });
-      if (json.email) setLoginEmail(String(json.email));
+      if (json.staffId) setLoginStaffId(String(json.staffId));
     } catch {
-      setSession({ loading: false, authenticated: false, email: "" });
+      setSession({ loading: false, authenticated: false, staffId: "" });
     }
   };
 
@@ -88,7 +88,7 @@ export default function StaffPosHandoffPage() {
       const response = await fetch("/api/staff/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+        body: JSON.stringify({ staffId: loginStaffId, pin: loginPin })
       });
       const json = await response.json();
 
@@ -96,7 +96,7 @@ export default function StaffPosHandoffPage() {
         throw new Error(parseApiError(json, "Unable to sign in"));
       }
 
-      setLoginPassword("");
+      setLoginPin("");
       await loadSession();
     } catch (requestError) {
       setLoginError(requestError.message || "Unable to sign in");
@@ -107,7 +107,7 @@ export default function StaffPosHandoffPage() {
 
   const handleLogout = async () => {
     await fetch("/api/staff/auth/logout", { method: "POST" }).catch(() => {});
-    setSession({ loading: false, authenticated: false, email: "" });
+    setSession({ loading: false, authenticated: false, staffId: "" });
     setHandoff(null);
     setCodeInput("");
   };
@@ -189,21 +189,22 @@ export default function StaffPosHandoffPage() {
 
             <form className={styles.form} onSubmit={handleLogin}>
               <label>
-                Email
+                Staff ID
                 <input
-                  type="email"
-                  value={loginEmail}
-                  onChange={(event) => setLoginEmail(event.target.value)}
+                  type="text"
+                  value={loginStaffId}
+                  onChange={(event) => setLoginStaffId(event.target.value)}
                   required
                 />
               </label>
 
               <label>
-                Password
+                PIN
                 <input
                   type="password"
-                  value={loginPassword}
-                  onChange={(event) => setLoginPassword(event.target.value)}
+                  inputMode="numeric"
+                  value={loginPin}
+                  onChange={(event) => setLoginPin(event.target.value)}
                   required
                 />
               </label>
@@ -227,7 +228,7 @@ export default function StaffPosHandoffPage() {
           <div className={styles.headerRow}>
             <div>
               <h1>POS Handoff Portal</h1>
-              <p>Signed in as {session.email}</p>
+              <p>Signed in as {session.staffId}</p>
               <p>Store: {storeId}</p>
             </div>
             <button type="button" className={styles.ghostButton} onClick={handleLogout}>

@@ -12,5 +12,5 @@ export async function GET(request) {
     return Response.json({ ok: true, authenticated: false });
   }
 
-  return Response.json({ ok: true, authenticated: true, email: session.email });
+  return Response.json({ ok: true, authenticated: true, staffId: session.staffId });
 }

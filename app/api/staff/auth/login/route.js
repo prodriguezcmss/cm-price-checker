@@ -5,7 +5,7 @@ import {
   getStaffSessionCookieName,
   getStaffSessionMaxAge,
   isStaffAuthConfigured,
-  validateStaffCredentials
+  validateStaffPinLogin
 } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
@@ -37,10 +37,10 @@ export async function POST(request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const email = String(body?.email || "").trim();
-  const password = String(body?.password || "");
+  const staffId = String(body?.staffId || "").trim();
+  const pin = String(body?.pin || "");
 
-  const result = validateStaffCredentials(email, password);
+  const result = validateStaffPinLogin({ staffId, pin });
   if (!result.ok) {
     return NextResponse.json(
       { ok: false, error: "Invalid credentials" },
@@ -48,7 +48,7 @@ export async function POST(request) {
     );
   }
 
-  const token = createStaffSessionToken(result.email);
+  const token = createStaffSessionToken(result.staffId);
   if (!token) {
     return NextResponse.json(
       { ok: false, error: "Failed to create session" },
@@ -56,7 +56,7 @@ export async function POST(request) {
     );
   }
 
-  const response = NextResponse.json({ ok: true, email: result.email });
+  const response = NextResponse.json({ ok: true, staffId: result.staffId });
   const isProduction = process.env.NODE_ENV === "production";
   response.cookies.set(getStaffSessionCookieName(), token, {
     httpOnly: true,
