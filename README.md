@@ -148,3 +148,13 @@ create index if not exists pos_handoffs_store_status_idx
 create index if not exists pos_handoffs_expires_at_idx
   on pos_handoffs (expires_at);
 ```
+
+## POS extension handoff API contract
+
+For Shopify POS tile integration details, see:
+
+- `docs/pos-extension-integration.md`
+
+The POS-ready claim endpoint is:
+
+- `POST /api/pos-handoff/claim-pos`

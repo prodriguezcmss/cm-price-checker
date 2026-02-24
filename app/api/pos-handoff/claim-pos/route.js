@@ -1,7 +1,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { isPosHandoffEnabled } from "@/lib/feature-flags";
-import { getAllowedStoreId, normalizeStoreId } from "@/lib/pos-handoff";
+import { buildPosCartLines, getAllowedStoreId, normalizeStoreId } from "@/lib/pos-handoff";
 import { validateStaffPinLogin } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
@@ -130,7 +130,8 @@ export async function POST(request) {
       storeId: data.store_id,
       status: "claimed",
       claimedAt,
-      items: Array.isArray(data.items) ? data.items : []
+      items: Array.isArray(data.items) ? data.items : [],
+      cartLines: buildPosCartLines(data.items)
     }
   });
 }
