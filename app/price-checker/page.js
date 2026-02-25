@@ -236,6 +236,18 @@ export default function PriceCheckerPage() {
     }
   };
 
+  const scheduleScannerRestart = () => {
+    if (autoResumeTimerRef.current) {
+      window.clearTimeout(autoResumeTimerRef.current);
+    }
+
+    autoResumeTimerRef.current = window.setTimeout(() => {
+      autoResumeTimerRef.current = null;
+      lastCodeRef.current = "";
+      startCamera();
+    }, 1400);
+  };
+
   const lookupProduct = async ({ barcode, sku }) => {
     const params = new URLSearchParams();
     if (barcode) params.set("barcode", barcode);
@@ -262,7 +274,9 @@ export default function PriceCheckerPage() {
       }
       if (barcode) {
         playSuccessFeedback();
-        setScannerStatus(`Barcode detected: ${barcode}. Product loaded.`);
+        stopCamera();
+        setScannerStatus(`Barcode detected: ${barcode}. Product loaded. Preparing next scan...`);
+        scheduleScannerRestart();
       }
     } catch (requestError) {
       setProduct(null);
