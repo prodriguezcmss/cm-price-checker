@@ -203,10 +203,6 @@ export default function PriceCheckerPage() {
     }
   };
 
-  const isCameraRunning = () => {
-    return Boolean(intervalRef.current || zxingControlsRef.current || streamRef.current);
-  };
-
   const playSuccessFeedback = () => {
     if (typeof window !== "undefined" && typeof window.navigator?.vibrate === "function") {
       window.navigator.vibrate(120);
@@ -240,22 +236,6 @@ export default function PriceCheckerPage() {
     }
   };
 
-  const scheduleAutoResume = () => {
-    if (!isCameraRunning()) return;
-
-    if (autoResumeTimerRef.current) {
-      window.clearTimeout(autoResumeTimerRef.current);
-    }
-
-    autoResumeTimerRef.current = window.setTimeout(() => {
-      setProduct(null);
-      setSuggestions([]);
-      setError("");
-      setScannerStatus("Ready to scan next item.");
-      autoResumeTimerRef.current = null;
-    }, 2200);
-  };
-
   const lookupProduct = async ({ barcode, sku }) => {
     const params = new URLSearchParams();
     if (barcode) params.set("barcode", barcode);
@@ -277,10 +257,12 @@ export default function PriceCheckerPage() {
       }
 
       setProduct(json.product);
+      if (sku) {
+        setManualSku("");
+      }
       if (barcode) {
         playSuccessFeedback();
-        setScannerStatus(`Barcode detected: ${barcode}. Auto-resuming scan...`);
-        scheduleAutoResume();
+        setScannerStatus(`Barcode detected: ${barcode}. Product loaded.`);
       }
     } catch (requestError) {
       setProduct(null);
