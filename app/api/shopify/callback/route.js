@@ -50,7 +50,7 @@ export async function GET(request) {
   }
 
   const tokenResponse = await fetch(
-    `https://${shop}/admin/oauth/access_token`,
+    "https://" + shop + "/admin/oauth/access_token",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -86,12 +86,28 @@ export async function GET(request) {
     );
   }
 
-  await supabase.from("shop_tokens").upsert({
-    shop,
-    access_token: accessToken,
-    scope,
-    installed_at: new Date().toISOString()
-  });
+  const { error: tokenStoreError } = await supabase
+    .from("shop_tokens")
+    .upsert(
+      {
+        shop,
+        access_token: accessToken,
+        scope,
+        installed_at: new Date().toISOString()
+      },
+      { onConflict: "shop" }
+    );
+
+  if (tokenStoreError) {
+    console.error("Unable to store Shopify token", {
+      code: tokenStoreError.code,
+      message: tokenStoreError.message
+    });
+    return NextResponse.json(
+      { ok: false, error: "Unable to store Shopify connection" },
+      { status: 500 }
+    );
+  }
 
   const response = NextResponse.json({ ok: true, shop, scope });
   response.cookies.delete("shopify_oauth_state");
