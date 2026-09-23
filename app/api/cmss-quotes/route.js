@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { shopifyGraphQL } from "../../../lib/shopify.js";
+import { resolveShopifyConfig, shopifyGraphQL } from "../../../lib/shopify.js";
 import { calculateQuote, fingerprint, freezeQuote } from "../../../lib/cmss-quotes/quote.js";
 import { composeEmail } from "../../../lib/cmss-quotes/email.js";
 import { renderQuotePdf } from "../../../lib/cmss-quotes/pdf.js";
@@ -39,7 +39,9 @@ export async function POST(request) {
   if (!/^[A-Za-z0-9_-]{20,100}$/.test(idempotencyKey)) return reply({ ok: false, error: "Reload the cart and try again." }, 400, origin);
   try {
     if (!await takeRateLimit(`ip:${clientKey(request)}`, 8, 3600)) return reply({ ok: false, error: "Too many quote requests. Please try again later." }, 429, origin);
-    const calculated = await calculateQuote(input, shopifyGraphQL);
+    const shopifyConfig = await resolveShopifyConfig();
+    if (!shopifyConfig) throw new Error("Shopify credentials are unavailable");
+    const calculated = await calculateQuote(input, (query, variables) => shopifyGraphQL(query, variables, shopifyConfig));
     const quote = freezeQuote(calculated, { id: randomUUID() });
     const pdf = await renderQuotePdf(quote);
     const saved = await enqueueQuote(quote, fingerprint(input, idempotencyKey), composeEmail(quote, pdf), composeEmail(quote, pdf, { team: true }));
